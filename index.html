@@ -1962,7 +1962,7 @@ function vTreinos() {
   if (!S.pronto) return topo('Treinos', false) + '<main class="wrap fichas"><p class="status">Carregando…</p></main>';
   const linha = f => {
     const ult = S.sessoes.find(s => s.ficha === f.id), vz = f.vezes ?? 1, c = cardioDe(f), emCurso = S.draft && S.draft.ficha === f.id;
-    return `<li><div><b>${esc(f.nome)}</b><small>${vz ? '' : 'Fora de uso · '}${f.itens.length} exerc.${c ? ` · cardio ${+c.min} min` : ''}${ult ? ` · último ${dataCurta(ult.data)}` : ''}</small></div>
+    return `<li><div><b>${esc(f.nome)}</b><small>${vz ? '' : 'Fora de uso · '}${f.itens.length} exerc.${c ? ` · cardio ${+c.min} min` : ''}${ult ? ` · último ${dataCurta(ult.data)}${ult.relogio && ult.relogio.fcMed ? ` · ${ult.relogio.fcMed} bpm` : ''}` : ''}</small></div>
       <button class="btn" data-a="iniciar" data-id="${f.id}" ${f.itens.length ? '' : 'disabled'}>${ICON.play}${emCurso ? 'Continuar' : 'Treinar'}</button></li>`;
   };
   const corpo = ps.length ? ps.map(p => {
@@ -1970,7 +1970,7 @@ function vTreinos() {
     return `<article class="pcard ${p.ativo ? 'on' : ''}"><button class="pcard-hd" data-a="prog" data-id="${p.id}"><div>${p.ativo ? '<span class="tag">Em uso</span>' : '<span class="tag off">Rascunho</span>'}<h2>${esc(p.nome)}</h2>
       <span class="meta">${fs.length} ficha${fs.length === 1 ? '' : 's'}${P ? ` · ${P.sess} sessões/semana` : ''}</span></div>${P ? selo(P.nota) : ''}</button>
       ${p.ativo && fs.length ? `<ul class="pfichas">${fs.map(linha).join('')}</ul>` : `<ul>${fs.map(f => `<li>${esc(f.nome)}</li>`).join('') || '<li>Sem fichas</li>'}</ul>`}</article>`;
-  }).join('') + `<button class="btn sec" data-a="novoProg">Novo treino em branco</button><div class="eyebrow">Ou crie a partir de um modelo</div>${botoesModelo()}`
+  }).join('') + `<button class="btn sec" data-a="novoProg">Novo treino em branco</button><div class="eyebrow">Ou crie a partir de um modelo</div>${botoesModelo()}` + botaoRelogio()
     : `<div class="vazio"><h2>Nenhum treino ainda</h2><p>Um treino é um conjunto de fichas que você faz na semana, por exemplo A/B ou A/B/C/D. Você pode montar vários para comparar e escolher um para usar.</p><div class="eyebrow">Comece de um modelo</div>${botoesModelo()}<button class="btn ghost" data-a="novoProg">Treino em branco</button></div>`;
   return topo('Treinos', false) + `<main class="wrap fichas"><p class="lead">O histórico de cargas é guardado por exercício: continua valendo quando você troca de treino ou de ficha.</p>${corpo}</main>`;
 }
@@ -2549,6 +2549,42 @@ document.addEventListener('change', ev => {
   else salvarPerfil({ [k]: k === 'dias' ? +t.value : t.value });
   render();
 });
+
+// ---------- relógio (Zepp/Amazfit · TCX) ----------
+function lerTCX(txt) {
+  const x = new DOMParser().parseFromString(txt, 'text/xml'); if (x.querySelector('parsererror')) return null;
+  const ac = x.getElementsByTagName('Activity')[0]; if (!ac) return null;
+  const txtDe = (el, n) => { const e = el.getElementsByTagName(n)[0]; return e ? e.textContent : ''; };
+  const valHR = el => { const h = el.getElementsByTagName('HeartRateBpm')[0] || el.getElementsByTagName('AverageHeartRateBpm')[0]; return h ? +txtDe(h, 'Value') || 0 : 0; };
+  const ini = new Date(txtDe(ac, 'Id')); if (isNaN(ini)) return null;
+  let dur = 0, kcal = 0, mx = 0; const hr = [], medLap = [];
+  for (const l of Array.from(ac.getElementsByTagName('Lap'))) {
+    dur += +txtDe(l, 'TotalTimeSeconds') || 0; kcal += +txtDe(l, 'Calories') || 0;
+    const m = l.getElementsByTagName('MaximumHeartRateBpm')[0], a = l.getElementsByTagName('AverageHeartRateBpm')[0];
+    if (m) mx = Math.max(mx, +txtDe(m, 'Value') || 0); if (a) medLap.push(+txtDe(a, 'Value') || 0);
+  }
+  for (const pt of Array.from(ac.getElementsByTagName('Trackpoint'))) { const v = valHR(pt); if (v > 0) hr.push(v); }
+  const media = v => v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+  return { inicio: ini.toISOString(), dur: Math.round(dur), kcal: Math.round(kcal), fcMed: media(hr) || media(medLap.filter(Boolean)), fcMax: Math.max(mx, hr.reduce((a, b) => Math.max(a, b), 0)) };
+}
+function casarSessao(r) {
+  const a = new Date(r.inicio).getTime(), b = a + r.dur * 1000; let best = null, bo = 0;
+  for (const s of S.sessoes) { const e = new Date(s.data).getTime(), i = e - (s.dur || 0) * 1000, ov = Math.min(b, e) - Math.max(a, i); if (ov > bo) { bo = ov; best = s; } }
+  return best;
+}
+async function importarTCX(files) {
+  let ok = 0, sem = 0, rim = 0, ult = null;
+  for (const f of files) {
+    let r = null; try { r = lerTCX(await f.text()); } catch {}
+    if (!r) { rim++; continue; }
+    const s = casarSessao(r); if (!s) { sem++; continue; }
+    const { id, ...doc } = s; doc.relogio = r; S.sessoes = S.sessoes.map(x => x.id === id ? { id, ...doc } : x); await Store.set('sessoes', id, doc); ok++; ult = s;
+  }
+  toast(ok ? `Relógio anexado a ${ok} treino${ok > 1 ? 's' : ''}${ult ? ' · ' + ult.fichaNome : ''}` : rim ? 'Arquivo não reconhecido. Exporte em formato TCX' : 'Nenhum treino salvo coincide com o horário do arquivo');
+  render();
+}
+document.addEventListener('change', ev => { const t = ev.target; if (t.dataset.a === 'tcxFile' && t.files && t.files.length) { importarTCX(Array.from(t.files)); t.value = ''; } });
+const botaoRelogio = () => `<label class="btn sec tcx">Importar treino do Amazfit (.tcx)<input type="file" accept=".tcx,.xml,text/xml,application/xml" multiple hidden data-a="tcxFile"></label><p class="aviso">No Zepp: atividade → Exportar dados → TCX. Salve em Arquivos e escolha aqui. O app casa pelo horário com o treino salvo.</p>`;
 
 // ---------- início ----------
 render();
