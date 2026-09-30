@@ -2578,10 +2578,16 @@ async function importarTCX(files) {
   for (const f of files) {
     let r = null; try { r = lerTCX(await f.text()); } catch {}
     if (!r) { rim++; continue; }
-    const s = casarSessao(r); if (!s) { sem++; continue; }
+    let s = casarSessao(r);
+    if (!s) {
+      const h = new Date(r.inicio).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      if (!confirm(`Nenhum treino salvo coincide com a atividade de ${h} (${Math.round(r.dur / 60)} min${r.fcMed ? `, FC média ${r.fcMed}` : ''}).\n\nCriar um treino manual com esses dados?`)) { sem++; continue; }
+      const id = Store.id(), doc = { ficha: null, fichaNome: 'Treino manual', prog: null, data: new Date(new Date(r.inicio).getTime() + r.dur * 1000).toISOString(), dur: r.dur, itens: [], relogio: r };
+      S.sessoes = [{ id, ...doc }, ...S.sessoes].sort((x, y) => (y.data || '').localeCompare(x.data || '')); await Store.set('sessoes', id, doc); ok++; ult = doc; continue;
+    }
     const { id, ...doc } = s; doc.relogio = r; S.sessoes = S.sessoes.map(x => x.id === id ? { id, ...doc } : x); await Store.set('sessoes', id, doc); ok++; ult = s;
   }
-  toast(ok ? `Relógio anexado a ${ok} treino${ok > 1 ? 's' : ''}${ult ? ' · ' + ult.fichaNome : ''}` : rim ? 'Arquivo não reconhecido. Exporte em formato TCX' : 'Nenhum treino salvo coincide com o horário do arquivo');
+  toast(ok ? `Relógio anexado a ${ok} treino${ok > 1 ? 's' : ''}${ult ? ' · ' + ult.fichaNome : ''}` : rim ? 'Arquivo não reconhecido. Exporte em formato TCX' : 'Nada importado');
   render();
 }
 document.addEventListener('change', ev => { const t = ev.target; if (t.dataset.a === 'tcxFile' && t.files && t.files.length) { importarTCX(Array.from(t.files)); t.value = ''; } });
