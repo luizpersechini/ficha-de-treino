@@ -655,6 +655,21 @@ h1, h2, h3, .btn, b { text-wrap: balance; }
 .selo > span { font-size: 9px; letter-spacing: .02em; max-width: 62px; overflow: hidden; }
 .saude .selo > span { font-size: 10px; max-width: 80px; }
 .sp { stroke: var(--stage); stroke-linecap: round; opacity: .8; }
+.ob { display: grid; gap: 16px; padding-top: 12px; padding-bottom: 32px; }
+.ob h2 { margin: 0; font: 800 26px/1.15 var(--display); letter-spacing: -.02em; }
+.obbar { height: 6px; border-radius: 99px; background: var(--surface2); overflow: hidden; }
+.obbar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.obops { display: flex; flex-wrap: wrap; gap: 8px; }
+.ob .obops .chip { min-height: 52px; font-size: 16px; }
+.perfil { display: grid; gap: 14px; padding-top: 8px; padding-bottom: 32px; }
+.pfhd { display: flex; align-items: center; gap: 14px; }
+.pfhd b { display: block; font: 800 20px/1.1 var(--display); }
+.pfhd small { color: var(--muted); font-size: 14px; }
+.avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font: 800 24px/1 var(--display); flex: none; }
+.pfstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pfstats div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; text-align: center; }
+.pfstats b { display: block; font: 800 20px/1.1 var(--display); }
+.pfstats small { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 </style>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <linearGradient id="gCorpo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--fig-hi)"/><stop offset="1" style="stop-color:var(--fig)"/></linearGradient>
@@ -1695,7 +1710,7 @@ function vImportar() {
 }
 async function analisarImp() {
   const idade = parseInt(document.getElementById('imp-idade')?.value, 10);
-  if (idade >= 10 && idade <= 100 && idade !== +(S.perfil && S.perfil.idade)) { S.perfil = { ...(S.perfil || {}), idade }; Store.set('perfil', 'eu', { idade }); }
+  if (idade >= 10 && idade <= 100 && idade !== +(S.perfil && S.perfil.idade)) { salvarPerfil({ idade }); }
   let txt = document.getElementById('imp-txt')?.value || '';
   const arq = document.getElementById('imp-arq')?.files?.[0];
   if (arq) { try { txt = await arq.text(); } catch { toast('Não foi possível ler o arquivo'); return; } }
@@ -1748,6 +1763,7 @@ const ICON = {
   play: '<svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg>',
   arrowUp: '<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
   eq: '<svg viewBox="0 0 24 24"><path d="M5 9h14M5 15h14"/></svg>',
+  user: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-6 7-6s7 2.1 7 6"/></svg>',
   pulse: '<svg viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg>',
 };
 
@@ -2103,11 +2119,13 @@ function vTreino() {
     <div class="fim"><div class="wrap">${blocoDescanso()}<button class="btn ${ok ? '' : 'sec'}" data-a="concluir" ${ok ? '' : 'disabled'}>Concluir treino</button></div></div></div>`;
 }
 function nav() {
-  const v = S.view.v, emEx = ['home', 'grupo', 'ex'].includes(v), emF = ['treinos', 'prog', 'ficha'].includes(v), emA = ['aer', 'importar'].includes(v);
+  const v = S.view.v, emEx = ['home', 'grupo', 'ex'].includes(v), emF = ['treinos', 'prog', 'ficha'].includes(v), emA = ['aer', 'importar'].includes(v), emP = v === 'perfil';
+  if (v === 'onboard') return '';
   return `<nav class="nav" aria-label="Seções"><div class="wrap">
     <button data-a="tab" data-id="home" ${emEx ? 'aria-current="page"' : ''}>${ICON.grid}Exercícios</button>
     <button data-a="tab" data-id="treinos" ${emF ? 'aria-current="page"' : ''}>${ICON.list}Treinos</button>
     <button data-a="tab" data-id="aer" ${emA ? 'aria-current="page"' : ''}>${ICON.pulse}Aeróbico</button>
+    <button data-a="tab" data-id="perfil" ${emP ? 'aria-current="page"' : ''}>${ICON.user}Perfil</button>
     ${S.draft ? `<button class="go" data-a="retomar">${ICON.play}Treino</button>` : ''}
   </div></nav>`;
 }
@@ -2116,7 +2134,7 @@ function render(scrollTop) {
   const v = S.view;
   let html;
   if (v.v === 'treino') html = vTreino();
-  else html = ({ home: vHome, grupo: () => vGrupo(v.id), ex: () => vEx(v.id), treinos: vTreinos, fichas: vTreinos, prog: () => vPrograma(v.id), ficha: () => vFicha(v.id), aer: vAer, importar: vImportar }[v.v] || vHome)() + nav();
+  else html = ({ home: vHome, grupo: () => vGrupo(v.id), ex: () => vEx(v.id), treinos: vTreinos, fichas: vTreinos, prog: () => vPrograma(v.id), ficha: () => vFicha(v.id), aer: vAer, importar: vImportar, perfil: vPerfil, onboard: vOnboard }[v.v] || vHome)() + nav();
   const y = window.scrollY;
   $('#app').innerHTML = html;
   $('#app').style.paddingBottom = v.v === 'treino' ? '0' : '';
@@ -2376,10 +2394,166 @@ async function acordar() { try { if ('wakeLock' in navigator && !lock) { lock = 
 function soltar() { try { lock && lock.release(); } catch {} lock = null; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.view.v === 'treino') acordar(); });
 
+// ---------- perfil e onboarding ----------
+const PF = {
+  sexo: [['f', 'Feminino'], ['m', 'Masculino'], ['o', 'Prefiro não informar']],
+  objetivo: [['hipertrofia', 'Ganhar massa'], ['emagrecimento', 'Emagrecer'], ['forca', 'Ganhar força'], ['condicionamento', 'Saúde e condicionamento']],
+  nivel: [['iniciante', 'Iniciante (menos de 6 meses)'], ['intermediario', 'Intermediário (6 meses a 2 anos)'], ['avancado', 'Avançado (mais de 2 anos)']],
+  dias: [[2, '2 dias por semana'], [3, '3 dias por semana'], [4, '4 dias por semana'], [5, '5 dias por semana'], [6, '6 dias por semana']],
+  local: [['academia', 'Academia completa'], ['casa', 'Casa (halteres e peso do corpo)']],
+  lesoes: [['ombro', 'Ombro'], ['joelho', 'Joelho'], ['lombar', 'Lombar']],
+};
+const pfRot = (c, v) => (PF[c].find(x => String(x[0]) === String(v)) || [0, '—'])[1];
+const OB = [
+  { k: 'nome', t: 'Como podemos te chamar?', tipo: 'texto' },
+  { k: 'idade', t: 'Qual a sua idade?', tipo: 'num', un: 'anos', min: 10, max: 100 },
+  { k: 'sexo', t: 'Sexo', tipo: 'op' },
+  { k: 'peso', t: 'Qual o seu peso?', tipo: 'num', un: 'kg', min: 30, max: 300 },
+  { k: 'altura', t: 'Qual a sua altura?', tipo: 'num', un: 'cm', min: 120, max: 230 },
+  { k: 'objetivo', t: 'Qual o seu objetivo principal?', tipo: 'op' },
+  { k: 'nivel', t: 'Há quanto tempo você treina com musculação?', tipo: 'op' },
+  { k: 'dias', t: 'Quantos dias por semana você consegue treinar?', tipo: 'op' },
+  { k: 'local', t: 'Onde você vai treinar?', tipo: 'op' },
+  { k: 'lesoes', t: 'Alguma região com dor ou lesão?', tipo: 'multi', dica: 'Vamos evitar exercícios que sobrecarregam essas regiões. Deixe em branco se não tiver nenhuma.' },
+];
+// candidatos por grupo: [academia, casa]; o gerador pega o primeiro liberado que ainda não entrou na ficha
+const SLOTS = {
+  peito: [['supino-reto', 'supino-inclinado', 'crossover', 'voador', 'supino-halteres'], ['flexao', 'supino-halteres']],
+  costas: [['puxada-frontal', 'remada-baixa', 'remada-unilateral', 'remada-curvada'], ['remada-unilateral', 'remada-curvada']],
+  ombro: [['desenvolvimento-halteres', 'elevacao-lateral', 'crucifixo-inverso', 'face-pull'], ['desenvolvimento-halteres', 'elevacao-lateral', 'crucifixo-inverso']],
+  ombroPost: [['face-pull', 'crucifixo-inverso'], ['crucifixo-inverso']],
+  biceps: [['rosca-direta', 'rosca-inclinada', 'rosca-martelo'], ['rosca-alternada', 'rosca-martelo', 'rosca-concentrada']],
+  triceps: [['triceps-polia', 'triceps-frances', 'supino-fechado'], ['triceps-frances', 'triceps-testa']],
+  quad: [['agachamento-livre', 'leg-press', 'cadeira-extensora', 'bulgaro', 'hack'], ['goblet', 'bulgaro', 'passada']],
+  post: [['stiff', 'mesa-flexora', 'hip-thrust', 'cadeira-flexora', 'terra'], ['stiff', 'hip-thrust', 'swing-kettlebell']],
+  pant: [['panturrilha-em-pe'], ['panturrilha-em-pe']],
+  core: [['prancha', 'abdominal-polia', 'elevacao-pernas', 'dead-bug', 'crunch', 'roda-abdominal'], ['prancha', 'dead-bug', 'crunch', 'mountain-climber', 'bird-dog', 'prancha-lateral']],
+};
+const BLOQ = {
+  ombro: ['desenvolvimento-halteres', 'desenvolvimento-maquina', 'elevacao-lateral', 'elevacao-lateral-polia', 'supino-inclinado', 'mergulho', 'barra-fixa'],
+  joelho: ['agachamento-livre', 'hack', 'bulgaro', 'passada', 'cadeira-extensora', 'goblet', 'mountain-climber'],
+  lombar: ['terra', 'stiff', 'bom-dia', 'remada-curvada', 'swing-kettlebell', 'agachamento-livre', 'farmers-carry', 'roda-abdominal', 'elevacao-pernas'],
+};
+function modeloPerfil(dias, nivel) {
+  const FB = [['quad', 'peito', 'costas', 'post', 'ombro', 'core', 'pant'], ['post', 'costas', 'peito', 'quad', 'biceps', 'triceps', 'core'], ['quad', 'costas', 'ombro', 'post', 'peito', 'triceps', 'core']];
+  const PPL = [['Treino A · Empurrar', ['peito', 'peito', 'ombro', 'ombro', 'triceps', 'triceps']], ['Treino B · Puxar', ['costas', 'costas', 'costas', 'ombroPost', 'biceps', 'biceps']], ['Treino C · Pernas', ['quad', 'quad', 'post', 'post', 'pant', 'core']]];
+  if (dias <= 2) return [['Treino A · Corpo inteiro', 1, FB[0]], ['Treino B · Corpo inteiro', 1, FB[1]]];
+  if (dias === 3) return nivel === 'iniciante' ? FB.map((s, i) => [`Treino ${'ABC'[i]} · Corpo inteiro`, 1, s]) : PPL.map(([n, s]) => [n, 1, s]);
+  if (dias === 4) return [['Treino A · Superior', 2, ['peito', 'costas', 'ombro', 'peito', 'costas', 'biceps', 'triceps']], ['Treino B · Inferior', 2, ['quad', 'post', 'quad', 'post', 'pant', 'core']]];
+  if (dias === 5) return [['Treino A · Peito e tríceps', 1, ['peito', 'peito', 'peito', 'triceps', 'triceps']], ['Treino B · Costas e bíceps', 1, ['costas', 'costas', 'costas', 'biceps', 'biceps']], ['Treino C · Pernas', 1, ['quad', 'quad', 'post', 'post', 'pant']], ['Treino D · Ombros e core', 1, ['ombro', 'ombro', 'ombro', 'ombroPost', 'core', 'core']], ['Treino E · Posterior e glúteos', 1, ['post', 'post', 'post', 'quad', 'pant', 'core']]];
+  return PPL.map(([n, s]) => [n, 2, s]);
+}
+function gerarDoPerfil(p) {
+  const dias = Math.max(2, Math.min(6, +p.dias || 3)), nivel = p.nivel || 'iniciante', obj = p.objetivo || 'hipertrofia', casa = p.local === 'casa' ? 1 : 0;
+  const bloq = new Set((p.lesoes || []).flatMap(l => BLOQ[l] || [])), max = { iniciante: 6, intermediario: 7, avancado: 8 }[nivel] || 6;
+  const prog = novoProg(`${pfRot('objetivo', obj)} · ${dias} dias`, false);
+  modeloPerfil(dias, nivel).forEach(([nome, vezes, slots]) => {
+    const usados = new Set(), ids = [];
+    for (const s of slots) {
+      if (ids.length >= max) break;
+      const id = SLOTS[s][casa].find(x => EX[x] && !bloq.has(x) && !usados.has(x));
+      if (id) { usados.add(id); ids.push(id); }
+    }
+    const itens = ids.map((id, i) => {
+      const e = EX[id], it = itemPadrao(id), comp = e.tipo === 'composto';
+      it.series = nivel !== 'iniciante' && comp && i < (nivel === 'avancado' ? 2 : 1) ? 4 : 3;
+      if (!e.unid && e.tipo !== 'isometrico') it.reps = obj === 'forca' ? (comp ? [4, 6] : [8, 10]) : obj === 'hipertrofia' ? [8, 12] : [12, 15];
+      if (obj === 'forca' && comp) it.desc = 180; else if (obj === 'emagrecimento') it.desc = 45;
+      return it;
+    });
+    const f = novaFicha(nome, itens, prog.id); f.vezes = vezes;
+    if (obj === 'emagrecimento') f.cardio = { min: 20, int: 'moderada', txt: 'Zona 2, ritmo confortável' };
+    else if (obj === 'condicionamento') f.cardio = { min: 15, int: 'moderada', txt: 'Ritmo em que dá para conversar' };
+    salvarFicha(f);
+  });
+  usarProg(prog.id); return prog.id;
+}
+function salvarPerfil(patch) {
+  S.perfil = { ...(S.perfil || {}), ...patch };
+  const { id, ...doc } = S.perfil; return Store.set('perfil', 'eu', doc);
+}
+function iniciarOb() { S.ob = { p: 0, d: clone(S.perfil && S.perfil.onboard ? S.perfil : { lesoes: [] }) }; S.ob.d.lesoes = S.ob.d.lesoes || []; S.pilha = []; S.view = { v: 'onboard' }; render(true); }
+function abrirOb() {
+  if (S.obVisto || !S.pronto) return; S.obVisto = true;
+  if (!(S.perfil && S.perfil.onboard) && !S.programas.length && !S.fichas.length) iniciarOb();
+}
+function vOnboard() {
+  if (!S.ob) S.ob = { p: 0, d: { lesoes: [] } };
+  const o = S.ob, st = OB[o.p], d = o.d, ult = o.p === OB.length - 1;
+  let corpo = '';
+  if (st.tipo === 'texto' || st.tipo === 'num') corpo = `<div class="field"><label for="ob-in">${esc(st.un || 'Nome')}</label><input class="inp" id="ob-in" data-a="pfIn" ${st.tipo === 'num' ? 'inputmode="decimal"' : 'autocomplete="given-name"'} value="${esc(d[st.k] ?? '')}"></div>`;
+  else if (st.tipo === 'op') corpo = `<div class="obops">${PF[st.k].map(([v, n]) => `<button class="chip" data-a="pfOp" data-v="${v}" aria-pressed="${String(d[st.k]) === String(v)}">${esc(n)}</button>`).join('')}</div>`;
+  else corpo = `<p class="lead">${esc(st.dica)}</p><div class="obops">${PF.lesoes.map(([v, n]) => `<button class="chip" data-a="pfMulti" data-v="${v}" aria-pressed="${d.lesoes.includes(v)}">${esc(n)}</button>`).join('')}</div>`;
+  const prox = st.tipo === 'op' ? '' : `<button class="btn" data-a="pfProx">${ult ? 'Criar minha ficha' : 'Continuar'}</button>`;
+  return topo('Criar sua ficha', false) + `<main class="wrap ob"><div class="obbar"><i style="width:${(o.p + 1) / OB.length * 100}%"></i></div>
+    <span class="eyebrow">Pergunta ${o.p + 1} de ${OB.length}</span><h2>${esc(st.t)}</h2>${corpo}${prox}
+    <button class="btn ghost" data-a="${o.p ? 'pfAnt' : 'pfPular'}">${o.p ? 'Voltar' : 'Agora não'}</button></main>`;
+}
+function obFinalizar() {
+  const d = { ...S.ob.d, onboard: true };
+  salvarPerfil(d); const pid = gerarDoPerfil(d); S.ob = null;
+  toast('Ficha criada'); S.pilha = [{ v: 'treinos' }]; S.view = { v: 'prog', id: pid }; render(true);
+}
+function vPerfil() {
+  const p = S.perfil;
+  if (!p || !p.onboard) return topo('Perfil', false) + `<main class="wrap fichas"><div class="vazio"><h2>Crie seu perfil</h2><p>Responda algumas perguntas sobre você e seus objetivos e o app monta uma ficha de treino sob medida.</p><button class="btn" data-a="pfRefazer">Começar</button></div></main>`;
+  const imc = p.peso && p.altura ? (p.peso / ((p.altura / 100) ** 2)).toFixed(1).replace('.', ',') : '—';
+  const sel = (k) => `<div class="field"><label for="pf-${k}">${{ sexo: 'Sexo', objetivo: 'Objetivo', nivel: 'Experiência', dias: 'Dias por semana', local: 'Local' }[k]}</label><select class="inp" id="pf-${k}" data-a="pfCampo" data-k="${k}">${PF[k].map(([v, n]) => `<option value="${v}" ${String(p[k]) === String(v) ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`;
+  const num = (k, r, un) => `<div class="field"><label for="pf-${k}">${r} (${un})</label><input class="inp" id="pf-${k}" inputmode="decimal" data-a="pfCampo" data-k="${k}" value="${esc(p[k] ?? '')}"></div>`;
+  const c = S.confirmar;
+  return topo('Perfil', false) + `<main class="wrap perfil">
+    <div class="pfhd"><span class="avatar">${esc((p.nome || '?').trim().charAt(0).toUpperCase())}</span><div><b>${esc(p.nome || 'Sem nome')}</b><small>${esc(pfRot('objetivo', p.objetivo))} · ${esc(pfRot('dias', p.dias))}</small></div></div>
+    <div class="pfstats"><div><b>${esc(p.peso ?? '—')}</b><small>kg</small></div><div><b>${esc(p.altura ?? '—')}</b><small>cm</small></div><div><b>${imc}</b><small>IMC</small></div></div>
+    <div class="field"><label for="pf-nome">Nome</label><input class="inp" id="pf-nome" data-a="pfCampo" data-k="nome" value="${esc(p.nome || '')}"></div>
+    ${num('idade', 'Idade', 'anos')}${num('peso', 'Peso', 'kg')}${num('altura', 'Altura', 'cm')}
+    ${sel('sexo')}${sel('objetivo')}${sel('nivel')}${sel('dias')}${sel('local')}
+    <div class="field"><label>Lesões ou dores</label><div class="obops">${PF.lesoes.map(([v, n]) => `<button class="chip" data-a="pfLes" data-v="${v}" aria-pressed="${(p.lesoes || []).includes(v)}">${esc(n)}</button>`).join('')}</div></div>
+    ${c === 'pf:gerar' ? `<p class="aviso">Cria um novo treino com estes dados e passa a usá-lo. Os treinos atuais ficam como rascunho.</p><div class="confirm"><button class="btn ghost" data-a="cancelar">Cancelar</button><button class="btn" data-a="pfGerar">Gerar</button></div>`
+      : `<button class="btn" data-a="pfPedirGerar">Gerar nova ficha com estes dados</button>`}
+    <button class="btn sec" data-a="pfRefazer">Refazer as perguntas</button>
+    ${c === 'pf:apagar' ? `<div class="confirm"><button class="btn ghost" data-a="cancelar">Manter</button><button class="btn" data-a="pfApagar">Apagar perfil</button></div>`
+      : `<button class="btn ghost perigo" data-a="pfPedirApagar">Apagar perfil</button><p class="aviso">Apagar o perfil não apaga treinos nem histórico.</p>`}
+    <p class="aviso">As fichas geradas são um ponto de partida. Em caso de dor ou condição de saúde, consulte um profissional.</p>
+  </main>`;
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-a^="pf"]'); if (!b) return;
+  const a = b.dataset.a, o = S.ob, st = o && OB[o.p];
+  switch (a) {
+    case 'pfRefazer': iniciarOb(); break;
+    case 'pfPular': S.ob = null; tab('home'); break;
+    case 'pfAnt': o.p = Math.max(0, o.p - 1); render(true); break;
+    case 'pfOp': o.d[st.k] = st.k === 'dias' ? +b.dataset.v : b.dataset.v; if (o.p < OB.length - 1) { o.p++; render(true); } break;
+    case 'pfMulti': { const l = o.d.lesoes, v = b.dataset.v, i = l.indexOf(v); i < 0 ? l.push(v) : l.splice(i, 1); render(); break; }
+    case 'pfProx': {
+      if (st.tipo === 'texto') { const v = ($('#ob-in').value || '').trim(); if (!v) { toast('Digite um nome'); break; } o.d[st.k] = v; }
+      else if (st.tipo === 'num') { const v = num($('#ob-in').value); if (v < st.min || v > st.max) { toast(`Informe um valor entre ${st.min} e ${st.max}`); break; } o.d[st.k] = v; }
+      if (o.p === OB.length - 1) obFinalizar(); else { o.p++; render(true); }
+      break;
+    }
+    case 'pfLes': { const l = [...(S.perfil.lesoes || [])], v = b.dataset.v, i = l.indexOf(v); i < 0 ? l.push(v) : l.splice(i, 1); salvarPerfil({ lesoes: l }); render(); break; }
+    case 'pfPedirGerar': S.confirmar = 'pf:gerar'; render(); break;
+    case 'pfPedirApagar': S.confirmar = 'pf:apagar'; render(); break;
+    case 'pfGerar': { S.confirmar = null; const pid = gerarDoPerfil(S.perfil); toast('Ficha criada'); S.pilha = [{ v: 'treinos' }]; S.view = { v: 'prog', id: pid }; render(true); break; }
+    case 'pfApagar': S.confirmar = null; S.perfil = null; Store.del('perfil', 'eu'); toast('Perfil apagado'); render(); break;
+  }
+});
+document.addEventListener('input', ev => {
+  const t = ev.target; if (t.dataset.a === 'pfIn' && S.ob) S.ob.d[OB[S.ob.p].k] = OB[S.ob.p].tipo === 'num' ? t.value.replace(/[^\d.,]/g, '') : t.value;
+});
+document.addEventListener('change', ev => {
+  const t = ev.target; if (t.dataset.a !== 'pfCampo') return;
+  const k = t.dataset.k, def = OB.find(x => x.k === k);
+  if (k === 'nome') { const v = t.value.trim(); if (!v) { render(); return; } salvarPerfil({ nome: v }); }
+  else if (def && def.tipo === 'num') { const v = num(t.value); if (v < def.min || v > def.max) { toast(`Informe um valor entre ${def.min} e ${def.max}`); render(); return; } salvarPerfil({ [k]: v }); }
+  else salvarPerfil({ [k]: k === 'dias' ? +t.value : t.value });
+  render();
+});
+
 // ---------- início ----------
 render();
 Store.init().then(() => {
-  let n = 0, migrou = false; const ok = () => { if (++n >= 5) { S.pronto = true; migrar(); } };
+  let n = 0, migrou = false; const ok = () => { if (++n >= 5) { S.pronto = true; migrar(); abrirOb(); } };
   const migrar = () => {
     if (migrou || !S.pronto) return; const soltas = S.fichas.filter(f => !f.prog || !S.programas.some(p => p.id === f.prog)); migrou = true;
     if (!soltas.length) return;
