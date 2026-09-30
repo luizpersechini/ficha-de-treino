@@ -670,6 +670,11 @@ h1, h2, h3, .btn, b { text-wrap: balance; }
 .pfstats div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; text-align: center; }
 .pfstats b { display: block; font: 800 20px/1.1 var(--display); }
 .pfstats small { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+.sesslist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sess { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; min-height: 60px; color: var(--ink); }
+.sess b { display: block; font: 800 16px/1.15 var(--display); }
+.sess small { color: var(--muted); font-size: 13px; }
+.sess svg { width: 18px; height: 18px; transform: rotate(180deg); flex: none; stroke: currentColor; fill: none; stroke-width: 2; }
 </style>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <linearGradient id="gCorpo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--fig-hi)"/><stop offset="1" style="stop-color:var(--fig)"/></linearGradient>
@@ -1973,7 +1978,7 @@ function vTreinos() {
       ${p.ativo && fs.length ? `<ul class="pfichas">${fs.map(linha).join('')}</ul>` : `<ul>${fs.map(f => `<li>${esc(f.nome)}</li>`).join('') || '<li>Sem fichas</li>'}</ul>`}</article>`;
   }).join('') + `<button class="btn sec" data-a="novoProg">Novo treino em branco</button><div class="eyebrow">Ou crie a partir de um modelo</div>${botoesModelo()}`
     : `<div class="vazio"><h2>Nenhum treino ainda</h2><p>Um treino é um conjunto de fichas que você faz na semana, por exemplo A/B ou A/B/C/D. Você pode montar vários para comparar e escolher um para usar.</p><div class="eyebrow">Comece de um modelo</div>${botoesModelo()}<button class="btn ghost" data-a="novoProg">Treino em branco</button></div>`;
-  return topo('Treinos', false) + `<main class="wrap fichas"><p class="lead">O histórico de cargas é guardado por exercício: continua valendo quando você troca de treino ou de ficha.</p>${corpo}</main>`;
+  return topo('Treinos', false) + `<main class="wrap fichas"><p class="lead">O histórico de cargas é guardado por exercício: continua valendo quando você troca de treino ou de ficha.</p>${S.sessoes.length ? `<button class="btn sec" data-a="ssHist">Histórico de treinos (${S.sessoes.length})</button>` : ''}${corpo}</main>`;
 }
 function vPrograma(id) {
   const p = S.programas.find(x => x.id === id);
@@ -2120,7 +2125,7 @@ function vTreino() {
     <div class="fim"><div class="wrap">${blocoDescanso()}<button class="btn ${ok ? '' : 'sec'}" data-a="concluir" ${ok ? '' : 'disabled'}>Concluir treino</button></div></div></div>`;
 }
 function nav() {
-  const v = S.view.v, emEx = ['home', 'grupo', 'ex'].includes(v), emF = ['treinos', 'prog', 'ficha'].includes(v), emA = ['aer', 'importar'].includes(v), emP = v === 'perfil';
+  const v = S.view.v, emEx = ['home', 'grupo', 'ex'].includes(v), emF = ['treinos', 'prog', 'ficha', 'sessoes', 'sessao'].includes(v), emA = ['aer', 'importar'].includes(v), emP = v === 'perfil';
   if (v === 'onboard') return '';
   return `<nav class="nav" aria-label="Seções"><div class="wrap">
     <button data-a="tab" data-id="home" ${emEx ? 'aria-current="page"' : ''}>${ICON.grid}Exercícios</button>
@@ -2135,7 +2140,7 @@ function render(scrollTop) {
   const v = S.view;
   let html;
   if (v.v === 'treino') html = vTreino();
-  else html = ({ home: vHome, grupo: () => vGrupo(v.id), ex: () => vEx(v.id), treinos: vTreinos, fichas: vTreinos, prog: () => vPrograma(v.id), ficha: () => vFicha(v.id), aer: vAer, importar: vImportar, perfil: vPerfil, onboard: vOnboard }[v.v] || vHome)() + nav();
+  else html = ({ home: vHome, grupo: () => vGrupo(v.id), ex: () => vEx(v.id), treinos: vTreinos, fichas: vTreinos, prog: () => vPrograma(v.id), ficha: () => vFicha(v.id), aer: vAer, importar: vImportar, perfil: vPerfil, onboard: vOnboard, sessoes: vSessoes, sessao: () => vSessao(v.id) }[v.v] || vHome)() + nav();
   const y = window.scrollY;
   $('#app').innerHTML = html;
   $('#app').style.paddingBottom = v.v === 'treino' ? '0' : '';
@@ -2574,7 +2579,7 @@ function casarSessao(r) {
   return best;
 }
 async function importarTCX(files) {
-  let ok = 0, sem = 0, rim = 0, ult = null;
+  let ok = 0, sem = 0, rim = 0, ult = null, novo = null;
   for (const f of files) {
     let r = null; try { r = lerTCX(await f.text()); } catch {}
     if (!r) { rim++; continue; }
@@ -2583,15 +2588,54 @@ async function importarTCX(files) {
       const h = new Date(r.inicio).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
       if (!confirm(`Nenhum treino salvo coincide com a atividade de ${h} (${Math.round(r.dur / 60)} min${r.fcMed ? `, FC média ${r.fcMed}` : ''}).\n\nCriar um treino manual com esses dados?`)) { sem++; continue; }
       const id = Store.id(), doc = { ficha: null, fichaNome: 'Treino manual', prog: null, data: new Date(new Date(r.inicio).getTime() + r.dur * 1000).toISOString(), dur: r.dur, itens: [], relogio: r };
-      S.sessoes = [{ id, ...doc }, ...S.sessoes].sort((x, y) => (y.data || '').localeCompare(x.data || '')); await Store.set('sessoes', id, doc); ok++; ult = doc; continue;
+      S.sessoes = [{ id, ...doc }, ...S.sessoes].sort((x, y) => (y.data || '').localeCompare(x.data || '')); await Store.set('sessoes', id, doc); ok++; ult = doc; novo = id; continue;
     }
     const { id, ...doc } = s; doc.relogio = r; S.sessoes = S.sessoes.map(x => x.id === id ? { id, ...doc } : x); await Store.set('sessoes', id, doc); ok++; ult = s;
   }
   toast(ok ? `Relógio anexado a ${ok} treino${ok > 1 ? 's' : ''}${ult ? ' · ' + ult.fichaNome : ''}` : rim ? 'Arquivo não reconhecido. Exporte em formato TCX' : 'Nada importado');
-  render();
+  if (novo && ok === 1) go({ v: 'sessao', id: novo }); else render();
 }
 document.addEventListener('change', ev => { const t = ev.target; if (t.dataset.a === 'tcxFile' && t.files && t.files.length) { importarTCX(Array.from(t.files)); t.value = ''; } });
 const botaoRelogio = () => `<label class="btn sec tcx">Importar treino do Amazfit (.tcx)<input type="file" multiple hidden data-a="tcxFile"></label><p class="aviso">No Zepp: atividade → Exportar dados → TCX. Salve em Arquivos e escolha aqui. O app casa pelo horário com o treino salvo.</p>`;
+
+// ---------- histórico de sessões ----------
+const fmtDH = iso => { try { return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace('.', ''); } catch { return ''; } };
+const paraLocal = iso => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+function vSessoes() {
+  const L = S.sessoes.map(s => `<li><button class="sess" data-a="ssVer" data-id="${s.id}"><span><b>${esc(s.fichaNome || 'Treino')}</b><small>${fmtDH(s.data)} · ${Math.round((s.dur || 0) / 60)} min${s.relogio && s.relogio.fcMed ? ` · ${s.relogio.fcMed} bpm` : ''}${s.ficha ? '' : ' · manual'}</small></span>${ICON.back}</button></li>`).join('');
+  return topo('Histórico') + `<main class="wrap fichas">${L ? `<ul class="sesslist">${L}</ul>` : '<p class="lead">Nenhum treino salvo ainda.</p>'}</main>`;
+}
+function vSessao(id) {
+  const s = S.sessoes.find(x => x.id === id); if (!s) return topo('Treino') + '<main class="wrap fichas"><p class="lead">Treino não encontrado.</p></main>';
+  const r = s.relogio, ex = (s.itens || []).filter(i => EX[i.ex]);
+  return topo(s.fichaNome || 'Treino') + `<main class="wrap perfil">
+    <div class="field"><label for="ss-n">Nome</label><input class="inp" id="ss-n" data-a="ssCampo" data-k="fichaNome" value="${esc(s.fichaNome || '')}"></div>
+    <div class="field"><label for="ss-d">Término</label><input class="inp" id="ss-d" type="datetime-local" data-a="ssCampo" data-k="data" value="${paraLocal(s.data)}"></div>
+    <div class="field"><label for="ss-m">Duração (min)</label><input class="inp" id="ss-m" inputmode="numeric" data-a="ssCampo" data-k="dur" value="${Math.round((s.dur || 0) / 60)}"></div>
+    ${r ? `<div class="eyebrow">Relógio</div><div class="pfstats"><div><b>${r.fcMed || '—'}</b><small>FC média</small></div><div><b>${r.fcMax || '—'}</b><small>FC máx</small></div><div><b>${r.kcal || '—'}</b><small>kcal</small></div></div>` : '<p class="aviso">Sem dados do relógio. Importe um TCX na tela inicial.</p>'}
+    ${ex.length ? `<div class="eyebrow">Exercícios</div><ul class="sesslist">${ex.map(i => `<li><div class="sess"><span><b>${esc(EX[i.ex].pt)}</b><small>${i.series.map(x => `${x.kg ? x.kg + ' kg × ' : ''}${x.reps}`).join(' · ')}</small></span></div></li>`).join('')}</ul>` : ''}
+    ${S.confirmar === 'ss:' + id ? `<div class="confirm"><button class="btn ghost" data-a="cancelar">Manter</button><button class="btn" data-a="ssApagar" data-id="${id}">Apagar treino</button></div>`
+      : `<button class="btn ghost perigo" data-a="ssPedirApagar" data-id="${id}">Apagar treino</button>`}
+  </main>`;
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-a^="ss"]'); if (!b) return;
+  const a = b.dataset.a, id = b.dataset.id;
+  if (a === 'ssHist') go({ v: 'sessoes' });
+  else if (a === 'ssVer') go({ v: 'sessao', id });
+  else if (a === 'ssPedirApagar') { S.confirmar = 'ss:' + id; render(); }
+  else if (a === 'ssApagar') { S.sessoes = S.sessoes.filter(x => x.id !== id); Store.del('sessoes', id); toast('Treino apagado'); voltar(); }
+});
+document.addEventListener('change', ev => {
+  const t = ev.target; if (t.dataset.a !== 'ssCampo' || S.view.v !== 'sessao') return;
+  const s = S.sessoes.find(x => x.id === S.view.id); if (!s) return;
+  const { id, ...doc } = clone(s), k = t.dataset.k;
+  if (k === 'fichaNome') { const v = t.value.trim(); if (!v) { render(); return; } doc.fichaNome = v; }
+  else if (k === 'data') { const d = new Date(t.value); if (isNaN(d)) { render(); return; } doc.data = d.toISOString(); }
+  else { const m = num(t.value); if (m < 1 || m > 600) { toast('Informe de 1 a 600 minutos'); render(); return; } doc.dur = Math.round(m * 60); }
+  S.sessoes = S.sessoes.map(x => x.id === id ? { id, ...doc } : x).sort((x, y) => (y.data || '').localeCompare(x.data || ''));
+  Store.set('sessoes', id, doc); render();
+});
 
 // ---------- início ----------
 render();
