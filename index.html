@@ -1904,6 +1904,7 @@ function vHome() {
   return topo('Exercícios', false) + `<main class="wrap home">
     ${blocoEmCurso()}
     ${S.pronto ? cardAerHome() : ''}
+    ${S.pronto ? botaoRelogio() : ''}
     ${alvoBar()}
     <div class="sec-h"><span class="eyebrow">Grupos musculares</span><span class="num">${EXERCICIOS.length} exercícios</span></div>
     <div class="grupos">${GRUPOS.map(g => `<button class="gcard" data-a="grupo" data-id="${g.id}">
@@ -1970,7 +1971,7 @@ function vTreinos() {
     return `<article class="pcard ${p.ativo ? 'on' : ''}"><button class="pcard-hd" data-a="prog" data-id="${p.id}"><div>${p.ativo ? '<span class="tag">Em uso</span>' : '<span class="tag off">Rascunho</span>'}<h2>${esc(p.nome)}</h2>
       <span class="meta">${fs.length} ficha${fs.length === 1 ? '' : 's'}${P ? ` · ${P.sess} sessões/semana` : ''}</span></div>${P ? selo(P.nota) : ''}</button>
       ${p.ativo && fs.length ? `<ul class="pfichas">${fs.map(linha).join('')}</ul>` : `<ul>${fs.map(f => `<li>${esc(f.nome)}</li>`).join('') || '<li>Sem fichas</li>'}</ul>`}</article>`;
-  }).join('') + `<button class="btn sec" data-a="novoProg">Novo treino em branco</button><div class="eyebrow">Ou crie a partir de um modelo</div>${botoesModelo()}` + botaoRelogio()
+  }).join('') + `<button class="btn sec" data-a="novoProg">Novo treino em branco</button><div class="eyebrow">Ou crie a partir de um modelo</div>${botoesModelo()}`
     : `<div class="vazio"><h2>Nenhum treino ainda</h2><p>Um treino é um conjunto de fichas que você faz na semana, por exemplo A/B ou A/B/C/D. Você pode montar vários para comparar e escolher um para usar.</p><div class="eyebrow">Comece de um modelo</div>${botoesModelo()}<button class="btn ghost" data-a="novoProg">Treino em branco</button></div>`;
   return topo('Treinos', false) + `<main class="wrap fichas"><p class="lead">O histórico de cargas é guardado por exercício: continua valendo quando você troca de treino ou de ficha.</p>${corpo}</main>`;
 }
@@ -2584,7 +2585,7 @@ async function importarTCX(files) {
   render();
 }
 document.addEventListener('change', ev => { const t = ev.target; if (t.dataset.a === 'tcxFile' && t.files && t.files.length) { importarTCX(Array.from(t.files)); t.value = ''; } });
-const botaoRelogio = () => `<label class="btn sec tcx">Importar treino do Amazfit (.tcx)<input type="file" accept=".tcx,.xml,text/xml,application/xml" multiple hidden data-a="tcxFile"></label><p class="aviso">No Zepp: atividade → Exportar dados → TCX. Salve em Arquivos e escolha aqui. O app casa pelo horário com o treino salvo.</p>`;
+const botaoRelogio = () => `<label class="btn sec tcx">Importar treino do Amazfit (.tcx)<input type="file" multiple hidden data-a="tcxFile"></label><p class="aviso">No Zepp: atividade → Exportar dados → TCX. Salve em Arquivos e escolha aqui. O app casa pelo horário com o treino salvo.</p>`;
 
 // ---------- início ----------
 render();
